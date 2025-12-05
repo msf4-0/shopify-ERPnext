@@ -11,10 +11,13 @@ app_color = "grey"
 app_email = "SHRDC@gmail.com"
 app_license = "MIT"
 
+
+
 # Includes in <head>
 # ------------------
 
 # include js, css files in header of desk.html
+
 # app_include_css = "/assets/shopify/css/shopify.css"
 # app_include_js = "/assets/shopify/js/shopify.js"
 
@@ -89,6 +92,20 @@ app_license = "MIT"
 
 # Scheduled Tasks
 # ---------------
+doc_events = {
+    "Item": {
+        "on_submit": "shopify.create_product.create_shopify_product",
+        "on_update": "shopify.update_product.update_shopify_product"
+    },
+
+    "Stock Ledger Entry": {
+        "on_submit": "shopify.update_product_inventory.update_product_stock"
+    },
+
+    "Item Price": {
+        "on_update": "shopify.update_product_price.update_product_price"
+    }
+}
 
 scheduler_events = {
 	#"all": [
