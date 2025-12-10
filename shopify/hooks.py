@@ -90,21 +90,35 @@ app_license = "MIT"
 #	}
 # }
 
-# Scheduled Tasks
+# Document Events
 # ---------------
+# Wire ERPNext DocType events to Shopify sync handlers
 doc_events = {
     "Item": {
-        "on_submit": "shopify.create_product.create_shopify_product",
-        "on_update": "shopify.update_product.update_shopify_product"
+        "on_submit": [
+            "shopify.create_product.on_submit",
+            "shopify.update_product.on_submit",
+            "shopify.update_product_price.on_submit",
+            "shopify.delete_product.on_submit",
+            "shopify.retrieve_product.on_submit",
+        ],
     },
-
-    "Stock Ledger Entry": {
-        "on_submit": "shopify.update_product_inventory.update_product_stock"
+    "Customer": {
+        "on_submit": [
+            "shopify.create_customer.on_submit",
+            "shopify.update_customer.on_submit",
+            "shopify.delete_customer.on_submit",
+            "shopify.retrieve_customer.on_submit",
+        ],
     },
-
-    "Item Price": {
-        "on_update": "shopify.update_product_price.update_product_price"
-    }
+    "Sales Order": {
+        "on_submit": [
+            "shopify.update_order.on_submit",
+            "shopify.delete_order.on_submit",
+            "shopify.cancel_order.on_submit",
+            "shopify.retrieve_order.on_submit",
+        ],
+    },
 }
 
 scheduler_events = {
@@ -144,4 +158,5 @@ scheduler_events = {
 # override_doctype_dashboards = {
 # 	"Task": "shopify.task.get_dashboard_data"
 # }
+
 
