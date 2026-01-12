@@ -3,13 +3,16 @@ import frappe
 import json
 
 @frappe.whitelist()
-def delete_shopify_customer(customerID, shopify_url):
+def delete_shopify_customer(customerID, shopify_url,access_token):
 
-    endpoint = 'customers/' + str(customerID) + '.json'
-    final_url = shopify_url + endpoint
-
-    # Send the POST request to create the product
-    response = requests.delete(final_url)
+    headers = {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": access_token
+    }
+    response = requests.delete(
+        f"{shopify_url}customers/{customerID}.json",
+        headers=headers
+    )
     response.raise_for_status() 
 
     if response.status_code == 200:
@@ -19,7 +22,6 @@ def delete_shopify_customer(customerID, shopify_url):
 
 # Attach the custom function to the 'Item' doctype's on_submit event
 def on_submit(doc, method):
-    delete_shopify_customer(doc.customer_id, doc.api_link)
+    shopify_doc = frappe.get_doc("Shopify Access", frappe.get_value("Shopify Access", {}, "name"))
+    delete_shopify_customer(doc.shopify_customer_id, shopify_doc.shopify_url, shopify_doc.access_token)
 
-# Ensure the on_submit function is triggered when an 'Item' document is submitted
-frappe.get_doc('DocType', 'Customer').on_submit = on_submit
