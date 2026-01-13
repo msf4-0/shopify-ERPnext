@@ -4,7 +4,7 @@ import json
 from requests.auth import HTTPBasicAuth
 
 @frappe.whitelist()
-def update_shopify_product(productID, itemCode, itemName, itemStatus, itemDescription, price, unitWeight, inventoryNum, shopify_url, access_token, imagePath):
+def update_shopify_product(itemCode, itemName, itemStatus, itemDescription, price, unitWeight, inventoryNum, shopify_url, access_token, imagePath):
     headers = {
         "X-Shopify-Access-Token": access_token,
         "Content-Type": "application/json"
@@ -28,7 +28,7 @@ def update_shopify_product(productID, itemCode, itemName, itemStatus, itemDescri
     }
 
     # Update product
-    response = requests.put(f"{shopify_url}products/{productID}.json", json=payload, headers=headers)
+    response = requests.put(f"{shopify_url}products/{itemCode}.json", json=payload, headers=headers)
     
     if response.status_code == 200:
         frappe.msgprint(f"Product '{itemName}' updated in Shopify.")
@@ -39,7 +39,7 @@ def update_shopify_product(productID, itemCode, itemName, itemStatus, itemDescri
 
     # Upload image
     if imagePath:
-        image_endpoint = f"{shopify_url}products/{productID}/images.json"
+        image_endpoint = f"{shopify_url}products/{itemCode}/images.json"
 
         image_payload = {
             "image": {
@@ -82,6 +82,6 @@ def on_submit(doc, method):
     else:
         status = "active"
 
-    update_shopify_product(doc.shopify_product_id, doc.item_code, doc.item_name, status, doc.description, doc.standard_rate, doc.weight_per_unit, doc.opening_stock, shopify_doc.shopify_url, shopify_doc.access_token, doc.image)
+    update_shopify_product(doc.item_code, doc.item_name, status, doc.description, doc.standard_rate, doc.weight_per_unit, doc.opening_stock, shopify_doc.shopify_url, shopify_doc.access_token, doc.image)
 
 

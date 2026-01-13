@@ -85,5 +85,5 @@ def after_insert(doc, method):
         secret_key
     )
     if product_id:
-        doc.db_set("shopify_product_id", str(product_id))
+        doc.db_set("item_code", str(product_id))
 
