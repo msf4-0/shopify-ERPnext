@@ -4,7 +4,7 @@ import json
 from requests.auth import HTTPBasicAuth
 
 @frappe.whitelist()
-def update_shopify_product(itemCode, itemName, itemStatus, itemDescription, price, unitWeight, inventoryNum, shopify_url, access_token, imagePath):
+def update_shopify_product(productId,itemCode, itemName, itemStatus, itemDescription, price, unitWeight, inventoryNum, shopify_url, access_token, imagePath):
     headers = {
         "X-Shopify-Access-Token": access_token,
         "Content-Type": "application/json"
@@ -12,6 +12,7 @@ def update_shopify_product(itemCode, itemName, itemStatus, itemDescription, pric
 
     payload = {
         "product": {
+            "id": productId,
             "title": itemName,
             "body_html": itemDescription,
             "vendor": "TD Furniture",
@@ -28,18 +29,21 @@ def update_shopify_product(itemCode, itemName, itemStatus, itemDescription, pric
     }
 
     # Update product
-    response = requests.put(f"{shopify_url}products/{itemCode}.json", json=payload, headers=headers)
-    
+    response = requests.put(f"{shopify_url}products/{productId}.json", json=payload, headers=headers)
+
     if response.status_code == 200:
         frappe.msgprint(f"Product '{itemName}' updated in Shopify.")
 
     else:
-        frappe.log_error(title="Shopify Product Update Failed", message=response.text)
-        frappe.msgprint(f"Failed to update product '{itemName}' in Shopify. Status: {response.status_code}")
+        frappe.log_error(
+        title="Shopify 422 Debug",
+        message=f"Payload: {json.dumps(payload)}\nResponse: {response.text}"
+        )
+        frappe.throw(f"Failed to update product. Status: {response.status_code}{response.content}")
 
     # Upload image
     if imagePath:
-        image_endpoint = f"{shopify_url}products/{itemCode}/images.json"
+        image_endpoint = f"{shopify_url}products/{productId}/images.json"
 
         image_payload = {
             "image": {
@@ -60,6 +64,7 @@ def update_shopify_product(itemCode, itemName, itemStatus, itemDescription, pric
                 title="Shopify Image Upload Failed",
                 message=image_response.text
             )
+    
 
 
 
@@ -82,6 +87,8 @@ def on_submit(doc, method):
     else:
         status = "active"
 
-    update_shopify_product(doc.item_code, doc.item_name, status, doc.description, doc.standard_rate, doc.weight_per_unit, doc.opening_stock, shopify_doc.shopify_url, shopify_doc.access_token, doc.image)
+
+
+    update_shopify_product(doc.shopify_product_id, doc.item_code, doc.item_name, status, doc.description, doc.standard_rate, doc.weight_per_unit, doc.opening_stock, shopify_doc.shopify_url, shopify_doc.access_token, doc.image)
 
 

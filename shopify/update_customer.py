@@ -3,17 +3,22 @@ import frappe
 import json
 
 @frappe.whitelist()
-def update_shopify_customer(customerID, firstName, lastName, mobileNum, emailID, address, addrCity, addrState, addrPostcode, customerNotes, customerTags, shopify_url,access_token):
-    print(f"Received arguments - productID: {customerID}, fName: {firstName}, lName: {lastName}, mobile: {mobileNum}, email: {emailID}, address: {address}, city: {addrCity}, state: {addrState}, zip: {addrPostcode}, notes: {customerNotes}, tags: {customerTags}, shopify_url: {shopify_url}")
-    customer_payload = { 
-            "email": emailID,
-            "first_name": firstName,
-            "last_name": lastName,
-            "note": customerNotes,
-            "tags": customerTags,
-            "currency": "MYR",
-        }
+def update_shopify_customer_by_email(shopifyCustomerId, firstName, lastName, mobileNum, emailID, address, addrCity, addrState, addrPostcode, customerNotes, customerTags, shopify_url, access_token):
+    # Find Shopify customer by shopify customer id
     
+    if not shopifyCustomerId:
+        frappe.msgprint("customer not found in shopify")
+        return
+    
+    customer_payload = { 
+        "id": shopifyCustomerId,
+        "first_name": firstName,
+        "last_name": lastName,
+        "email": emailID,
+        "note": customerNotes,
+        "tags": customerTags,
+        "currency": "MYR",
+    }
     if mobileNum:
         customer_payload["phone"] = "+60" + mobileNum
 
@@ -25,12 +30,11 @@ def update_shopify_customer(customerID, firstName, lastName, mobileNum, emailID,
             "country": "Malaysia",
             "zip": addrPostcode
         }]
-    # Construct the API payload
     payload = {
         "customer": customer_payload
     }
 
-    endpoint = 'customers/' + str(customerID) + '.json'
+    endpoint = f'customers/{shopifyCustomerId}.json'
     final_url = shopify_url + endpoint
 
     headers = {
@@ -39,30 +43,23 @@ def update_shopify_customer(customerID, firstName, lastName, mobileNum, emailID,
     }
 
     try:
-        # Send the PUT request to create the product
         response = requests.put(final_url, json=payload, headers=headers)
-        response.raise_for_status()  # Raise an exception for HTTP errors (4xx, 5xx)
-        
+        response.raise_for_status()
         if response.status_code == 200:
             frappe.msgprint(f"Customer record was updated in Shopify.")
         else:
             error_message = response.text 
             frappe.msgprint(f"Shopify API returned a non-success status code: {response.status_code}. Error message: {error_message}")
-    
     except requests.exceptions.RequestException as e:
-        # Handle any exceptions that occur during the request
         frappe.msgprint(f"An error occurred while making the Shopify API request: {response.text}")
 
-
-# Attach the custom function to the 'Item' doctype's on_submit event
 def on_submit(doc, method):
     if doc.flags.in_insert:
         return
     
     shopify_doc = frappe.get_doc("Shopify Access", frappe.get_value("Shopify Access", {}, "name"))
-    email = doc.email_id if hasattr(doc, "email_id") and doc.email_id else "noemail@example.com"
 
-    update_shopify_customer(
+    update_shopify_customer_by_email(
         doc.shopify_customer_id,
         doc.customer_name,
         "", 
@@ -77,5 +74,6 @@ def on_submit(doc, method):
         shopify_doc.shopify_url,
         shopify_doc.access_token
     )
-# Ensure the on_submit function is triggered when an 'Item' document is submitted
+
+# Ensure the on_submit function is triggered when a Customer document is submitted
 frappe.get_doc('DocType', 'Customer').on_submit = on_submit

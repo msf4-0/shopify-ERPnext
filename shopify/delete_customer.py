@@ -18,7 +18,7 @@ def delete_shopify_customer(customerID, shopify_url,access_token):
     if response.status_code == 200:
         frappe.msgprint(f"Customer record was deleted from Shopify.")
     else:
-        frappe.msgprint("Failed to delete the customer in Shopify. Error: {response.content}")
+        frappe.msgprint(f"Failed to delete the customer in Shopify. Error: {response.content}")
 
 # Attach the custom function to the 'Item' doctype's on_submit event
 def on_submit(doc, method):

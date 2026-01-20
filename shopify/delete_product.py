@@ -33,5 +33,5 @@ def on_submit(doc, method):
     shopify_url = shopify_doc.shopify_url
     secret_key = shopify_doc.access_token
 
-    delete_shopify_product(doc.item_code, shopify_url, secret_key)
+    delete_shopify_product(doc.shopify_product_id, shopify_url, secret_key)
 

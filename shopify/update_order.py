@@ -34,7 +34,7 @@ def update_shopify_order(orderID, status, shopify_url,access_token):
         "X-Shopify-Access-Token": access_token
     }
 
-    final_url = f"{shopify_url}orders.json"
+    final_url = f"{shopify_url}orders/{orderID}.json"
 
 
     try:

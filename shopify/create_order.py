@@ -3,7 +3,7 @@ import frappe
 import json
 
 @frappe.whitelist()
-def create_shopify_order(customer_email, items, shopify_url,access_token,sales_order_name=None):
+def create_shopify_order(customer_email, items, shopify_url, access_token, sales_order_name=None):
     
     items = json.loads(items)
     print(items)
@@ -55,7 +55,13 @@ def create_shopify_order(customer_email, items, shopify_url,access_token,sales_o
     else:
         frappe.msgprint(f"Failed to create the order in Shopify. Error: {response.content}")
 
+    return shopify_order.get("id")
+
 def on_submit(doc, method):
+
+    if doc.shopify_order_id:
+        return
+    
     customer_doc = frappe.get_doc("Customer", doc.customer)
     customer_email = customer_doc.email_id
     items = []
@@ -74,4 +80,6 @@ def on_submit(doc, method):
         frappe.get_value("Shopify Access", {}, "name")  # first Shopify Access record
     )
     
-    create_shopify_order(customer_email, json.dumps(items), shopify_doc.shopify_url, shopify_doc.access_token,sales_order_name=doc.name)
+    shopify_order_id= create_shopify_order(customer_email, json.dumps(items), shopify_doc.shopify_url, shopify_doc.access_token,sales_order_name=doc.name)
+
+    doc.db_set("shopify_order_id", shopify_order_id)

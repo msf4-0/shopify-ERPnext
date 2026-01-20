@@ -22,7 +22,7 @@ def delete_shopify_order(orderID, shopify_url,access_token):
 # Attach the custom function to the 'Item' doctype's on_submit event
 def on_submit(doc, method):
     shopify_doc = frappe.get_doc("Shopify Access", frappe.get_value("Shopify Access", {}, "name"))
-    delete_shopify_order(doc.order_id, shopify_doc.shopify_url, shopify_doc.access_token)
+    delete_shopify_order(doc.shopify_order_id, shopify_doc.shopify_url, shopify_doc.access_token)
 
 # Ensure the on_submit function is triggered when an 'Item' document is submitted
 frappe.get_doc('DocType', 'Sales Order').on_submit = on_submit

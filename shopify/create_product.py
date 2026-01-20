@@ -41,22 +41,24 @@ def create_shopify_product(itemCode, itemName, itemStatus, itemDescription, pric
     
         product_data = response.json()
         product_id = product_data["product"]["id"]
+        frappe.msgprint(f"Created Shopify product {product_id}")
         
     else:
-        frappe.msgprint(f"Failed to create the product in Shopify. Error: {response.content}")
+        frappe.throw(f"Failed to create the product in Shopify. Error: {response.content}")
     
     return product_id
 
 # Attach the custom function to the 'Item' doctype's on_submit event
 def after_insert(doc, method):
+
+    if doc.shopify_product_id:
+        return
+    
     # Fetch Shopify Access credentials
     shopify_doc = frappe.get_doc(
         "Shopify Access",
         frappe.get_value("Shopify Access", {}, "name")  # first Shopify Access record
     )
-
-    if doc.shopify_product_id:
-        return
 
     shopify_url = shopify_doc.shopify_url
     api_key = shopify_doc.api_key
@@ -85,5 +87,5 @@ def after_insert(doc, method):
         secret_key
     )
     if product_id:
-        doc.db_set("item_code", str(product_id))
+        doc.db_set("shopify_product_id", str(product_id))
 
