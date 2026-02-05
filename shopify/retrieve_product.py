@@ -1,90 +1,86 @@
-import requests
-import base64
 import frappe
+import requests
 
-@frappe.whitelist()
-def retrieve_shopify_products(api_key, api_password, shopify_store_url):
-    # Construct the Shopify API endpoint for fetching products
-    api_endpoint = shopify_store_url + "products.json"
 
-    # Set up the request headers with basic authentication
+def retrieve_shopify_product(api_key, password, shopify_url):
     headers = {
-        'Authorization': 'Basic ' + base64.b64encode(f"{api_key}:{api_password}".encode()).decode(),
+        "X-Shopify-Access-Token": password,
+        "Content-Type": "application/json",
     }
 
-    # Make the GET request to Shopify API
-    try:
-        response = requests.get(api_endpoint, headers=headers)
+    frappe.logger().info("Starting full Shopify product sync")
 
-        # Check the response status code
-        if response.status_code == 200:
-            products_data = response.json().get("products", [])
+    url = f"{shopify_url}products.json?limit=250"
 
-            # Process the retrieved products
-            if products_data:
-                product_list = []
+    while url:
+        response = requests.get(url, headers=headers)
 
-                for shopify_product in products_data:
-                    product_list.append(shopify_product)
+        if response.status_code != 200:
+            frappe.log_error(
+                f"Shopify fetch failed: {response.status_code} - {response.text}"
+            )
+            break
 
-                create_items(product_list)  # Create product records in ERPNext
+        data = response.json()
+        products = data.get("products", [])
 
-                frappe.msgprint("Shopify products retrieved and new items created in ERPNext.")
-            else:
-                frappe.msgprint("No products retrieved from Shopify.")
-        else:
-            frappe.msgprint(f"Failed to fetch data from Shopify. Status code: {response.status_code}")
+        for product in products:
+            _upsert_item_from_shopify(product)
+            frappe.logger().info(
+                f"Synced product {product.get('title')} ({product.get('id')})"
+            )
+        frappe.db.commit()
+        # Pagination handling
+        link_header = response.headers.get("Link")
+        url = None
 
-    except Exception as e:
-        frappe.msgprint(f"An error occurred: {str(e)}")
+        if link_header:
+            for part in link_header.split(","):
+                if 'rel="next"' in part:
+                    url = part.split(";")[0].strip("<> ")
+                    break
 
-def create_items(shopify_products):
-    for shopify_product in shopify_products:
-        item_code = shopify_product["variants"][0]["sku"]  # Adjust as per your Shopify product data
+    frappe.logger().info("Shopify product sync completed")
 
-        # Check if a product with the same item code already exists in ERPNext
-        existing_item = frappe.get_all('Item', filters={'item_code': item_code}, fields=['name'])
 
-        if not existing_item:
-            # Create a new item record in ERPNext
-            new_item = frappe.new_doc("Item")
-            new_item.item_code = item_code
-            new_item.item_name = shopify_product["title"]
-            new_item.product_id = shopify_product["id"]
-            new_item.item_group = "Products"
-            new_item.description = shopify_product["body_html"]
-            new_item.prod_status = shopify_product["status"]
-            new_item.standard_rate = shopify_product["variants"][0]["price"]
-            new_item.weight_per_unit = shopify_product["variants"][0]["weight"]
-            new_item.opening_stock = shopify_product["variants"][0]["inventory_quantity"]
-            new_item.stock_uom = "Nos"
-            new_item.weight_uom = "Nos"
-            if shopify_product["image"] is not None:
-                new_item.image = shopify_product["image"]["src"]
-            new_item.insert()  # Insert product record
-        else:
-            # Item already exists, update its fields
-            existing_item_name = existing_item[0]["name"]
-            existing_item_doc = frappe.get_doc("Item", existing_item_name)
-            existing_item_price_doc = frappe.get_doc("Item Price", existing_item_name)
+def _upsert_item_from_shopify(product):
+    shopify_product_id = str(product.get("id"))
+    title = product.get("title")
+    description = product.get("body_html") or ""
+    handle = product.get("handle")
+    product_type = product.get("product_type")
 
-            # Update fields with the new Shopify information
-            existing_item_doc.item_name = shopify_product["title"]
-            existing_item_doc.product_id = shopify_product["id"]
-            existing_item_doc.description = shopify_product["body_html"]
-            existing_item_doc.prod_status = shopify_product["status"]
-            existing_item_price_doc.price_list_rate = shopify_product["variants"][0]["price"]
-            existing_item_doc.weight_per_unit = shopify_product["variants"][0]["weight"]
-            existing_item_doc.opening_stock = shopify_product["variants"][0]["inventory_quantity"]
-            if shopify_product["image"] is not None:
-                existing_item_doc.image = shopify_product["image"]["src"]
-            existing_item_doc.save()  # Save the updated item record
+    # Use the first variant for SKU & inventory
+    variant = product.get("variants", [{}])[0]
+    item_code = variant.get("sku") or f"SHOPIFY-{shopify_product_id}"
 
-            frappe.msgprint(f"Item with item code '{item_code}' in ERPNext updated with Shopify information.")
+    # Check if Item already exists using Shopify Product ID
+    existing_item = frappe.db.get_value(
+        "Item", {"shopify_product_id": shopify_product_id}, "name"
+    )
 
-# Attach the custom function to the 'Item' doctype's on_submit event
-def on_submit(doc, method):
-    retrieve_shopify_products(doc.apikey, doc.apitoken, doc.api_link)
+    if existing_item:
+        #  Update existing item
+        frappe.logger().info(f"Updated existing Item: {existing_item}")
+        frappe.msgprint(f"Updated existing Item: {existing_item}")
+    else:
+        #  Create new item
+        # Make sure item_code is unique
+        item = frappe.new_doc("Item")
+        item.item_code = item_code
+        item.shopify_product_id = shopify_product_id
+        item.item_group = "All Item Groups"
+        item.stock_uom = "Nos"
+        item.is_stock_item = 1
+        item.insert(ignore_permissions=True)
+        frappe.log_error(f"Created new Item: {title}")
 
-# Ensure the on_submit function is triggered when an 'Item' document is submitted
-frappe.get_doc('DocType', 'Item').on_submit = on_submit
+
+
+def on_submit():
+    
+    shopify_doc = frappe.get_doc(
+        "Shopify Access",
+        frappe.get_value("Shopify Access", {}, "name")
+    )
+    retrieve_shopify_product(shopify_doc.api_key, shopify_doc.access_token, shopify_doc.shopify_url)

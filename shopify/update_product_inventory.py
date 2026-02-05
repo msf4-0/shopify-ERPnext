@@ -36,3 +36,10 @@ def update_shopify_product(item_code, shopify_id, api_link, qty):
     else:
         frappe.msgprint(f"Failed to update the product in Shopify. Error: {response.content}")
         
+
+def on_submit(doc, method):
+    shopify_doc = frappe.get_doc(
+        "Shopify Access",
+        frappe.get_value("Shopify Access", {}, "name")  # first Shopify Access record
+    )
+    update_shopify_product(doc.item_code, doc.shopify_product_id, doc.api_link, doc.actual_qty)

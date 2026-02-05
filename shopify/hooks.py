@@ -127,7 +127,8 @@ scheduler_events = {
         "shopify.automated_orders.execute",
         "shopify.retrieve_customer.on_submit",
         "shopify.retrieve_order.scheduled_retrieve_shopify_orders",
-        "shopify.retrieve_product.on_submit"
+        "shopify.retrieve_product.on_submit",
+
 
 	]
     
