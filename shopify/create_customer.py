@@ -58,7 +58,8 @@ def create_shopify_customer(firstName, lastName, mobileNum, emailID, address, ad
     return customer["id"]
 
 def on_submit(doc, method):
-
+    if getattr(doc.flags, "ignore_shopify_update", False):
+        return
     if doc.shopify_customer_id:
         return
 

@@ -70,7 +70,8 @@ def update_shopify_product(productId,itemCode, itemName, itemStatus, itemDescrip
 
 # Attach the custom function to the 'Item' doctype's on_submit event
 def on_submit(doc, method):
-
+    if getattr(doc.flags, "ignore_shopify_update", False):
+        return
     if doc.flags.in_insert:
         return
     

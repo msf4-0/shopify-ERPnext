@@ -5,7 +5,7 @@ import frappe
 @frappe.whitelist()
 def retrieve_shopify_customers(api_key, api_password, shopify_store_url):
     # Construct the Shopify API endpoint for fetching customers
-    api_endpoint = f"{shopify_store_url}customers.json"
+    api_endpoint = f"{shopify_store_url}customers.json?limit=250"
 
     # Set up the request headers with basic authentication
     headers = {
@@ -14,7 +14,7 @@ def retrieve_shopify_customers(api_key, api_password, shopify_store_url):
     }
 
     # Make the GET request to Shopify API
-    try:
+    while api_endpoint:
         response = requests.get(api_endpoint, headers=headers)
 
         # Check the response status code
@@ -25,66 +25,79 @@ def retrieve_shopify_customers(api_key, api_password, shopify_store_url):
                 for shopify_customer in customers_data:
                     create_customer([shopify_customer])  # Create customer records in ERPNext
 
-                frappe.log_error("Shopify customers retrieved and created in ERPNext.")
+                frappe.log_error(f"Shopify customers retrieved {len(customers_data)} and created in ERPNext.")
             else:
                 frappe.log_error("No customers retrieved from Shopify.")
         else:
             frappe.log_error(f"Failed to fetch data from Shopify. Status code: {response.status_code}")
 
-    except Exception as e:
-        frappe.log_error(
-            title="Shopify Customer Debugging",
+        link_header = response.headers.get("Link")
+        url = None
 
-            message={"error": str(e), "shopify_customer_id": shopify_customer.get("id") if 'shopify_customer' in locals() else 'N/A'}
-        )
+        if link_header:
+            for part in link_header.split(","):
+                if 'rel="next"' in part:
+                    url = part.split(";")[0].strip("<> ")
+                    break
+
+    frappe.logger().info("Shopify product sync completed")
         
 
 def create_customer(shopify_customers):
     for shopify_customer in shopify_customers:
         shopify_customer_id = str(shopify_customer.get("id"))
+        addresses = shopify_customer.get("addresses") or []
+        first_name = shopify_customer.get("first_name") or ""
+        last_name = shopify_customer.get("last_name") or ""
+        email = shopify_customer.get("email") or ""
+        phone = shopify_customer.get("phone") or ""
 
+        full_name = (first_name + " " + last_name).strip() or "Shopify Customer"
         existing_customer = frappe.db.get_value(
             "Customer",
             {"shopify_customer_id": shopify_customer_id},
             "name"
         )
-
         if existing_customer:
-            continue  # Skip if customer already exists
+            customer = frappe.get_doc("Customer", existing_customer)
+            customer.customer_name = full_name
+            customer.email_id = email
+            customer.mobile_no = phone
+            customer.primary_address = (
+                addresses[0].get("address1")
+                if addresses and addresses[0].get("address1")
+                else "No address provided"
+            )
+            customer.flags.ignore_shopify_update = True
+            customer.save(ignore_permissions=True)
 
-        contact = create_contact(shopify_customer)
-
+            frappe.db.commit()
+            continue 
+        
         customer = frappe.new_doc("Customer")
-        customer.customer_name = contact.first_name + " " + contact.last_name
-        customer.email_id = contact.email_id
+        customer.customer_name = full_name
+        customer.email_id = email
         customer.shopify_customer_id = shopify_customer_id
-
-        # Address (safe)
-        addresses = shopify_customer.get("addresses") or []
-        if addresses and addresses[0].get("address1"):
-            customer.primary_address = addresses[0].get("address1")
-        else:
-            customer.primary_address = "No address provided"
+        customer.mobile_no = phone
+        customer.primary_address = (
+            addresses[0].get("address1")
+            if addresses and addresses[0].get("address1")
+            else "No address provided"
+        )
 
         customer.default_currency = "MYR"
         customer.default_price_list = "Standard Selling"
         customer.customer_group = "All Customer Groups"
         customer.customer_type = "Individual"
         customer.territory = "All Territories"
+        customer.flags.ignore_shopify_update = True
 
         customer.insert(ignore_permissions=True)
-
-        contact.append("links", {
-            "link_doctype": "Customer",
-            "link_name": customer.name
-        })
-        contact.save(ignore_permissions=True)
-
         frappe.db.commit()
 
         frappe.log_error(
             title="Customer Created",
-            message=f"Customer {customer.name} linked to Contact {contact.name}"
+            message=f"Customer {customer.name} created"
         )
 
 

@@ -12,6 +12,7 @@ def retrieve_shopify_product(api_key, password, shopify_url):
 
     url = f"{shopify_url}products.json?limit=250"
 
+
     while url:
         response = requests.get(url, headers=headers)
 
@@ -52,30 +53,35 @@ def _upsert_item_from_shopify(product):
 
     # Use the first variant for SKU & inventory
     variant = product.get("variants", [{}])[0]
-    item_code = variant.get("sku") or f"SHOPIFY-{shopify_product_id}"
+    item_code = variant.get("sku") or f"{shopify_product_id}"
 
-    # Check if Item already exists using Shopify Product ID
+    # Check if Item already exists using Item Code
     existing_item = frappe.db.get_value(
-        "Item", {"shopify_product_id": shopify_product_id}, "name"
+        "Item", {"item_code": item_code}, "name"
     )
 
     if existing_item:
-        #  Update existing item
+        item = frappe.get_doc("Item", existing_item)
+        item.item_name = title
+        item.description = description
+        item.flags.ignore_shopify_update = True
+        item.save(ignore_permissions=True)
         frappe.logger().info(f"Updated existing Item: {existing_item}")
-        frappe.msgprint(f"Updated existing Item: {existing_item}")
+      
     else:
         #  Create new item
         # Make sure item_code is unique
         item = frappe.new_doc("Item")
         item.item_code = item_code
         item.shopify_product_id = shopify_product_id
+        item.item_name = title
+        item.description = description
         item.item_group = "All Item Groups"
         item.stock_uom = "Nos"
         item.is_stock_item = 1
+        item.flags.ignore_shopify_update = True
         item.insert(ignore_permissions=True)
-        frappe.log_error(f"Created new Item: {title}")
-
-
+        frappe.logger().info(f"added item: {product}")
 
 def on_submit():
     
